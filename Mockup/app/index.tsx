@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 
 export default function Component() {
   const router = useRouter()
-  //this should work
+  //this should work 2
   const featuredProducts = [
     {
       id: 1,
