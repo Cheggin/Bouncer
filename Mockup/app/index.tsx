@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 
 export default function Component() {
   const router = useRouter()
-
+  //this should work
   const featuredProducts = [
     {
       id: 1,
@@ -113,10 +113,10 @@ export default function Component() {
         <Text style={{ color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>Find everything you need to complete your arsenal</Text>
 
         {categories.map((category, index) => (
-          <View key={index} style={{ backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#100'}}>
+          <View key={index} style={{ backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
               <View style={{padding: 12, borderRadius: 50, marginBottom: 12 }}>
-                
+
               </View>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 4 }}>{category.name}</Text>
               <Text style={{ color: '#6b7280', textAlign: 'center' }}>{category.description}</Text>
