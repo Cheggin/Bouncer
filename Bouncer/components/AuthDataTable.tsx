@@ -11,6 +11,7 @@ interface Profile {
   full_name?: string;
   email?: string;
   created_at: string;
+  risk_level?: number;
   // Add other fields from your 'profiles' table here
 }
 
@@ -54,36 +55,36 @@ export default function AuthDataTable() {
     }
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
+  const getRiskLevelColor = (riskLevel: number | undefined) => {
+    if (!riskLevel) return '#999';
+    if (riskLevel > 50) return '#ff4444'; // Red for high risk
+    if (riskLevel > 25) return '#ffaa00'; // Orange for medium risk
+    return '#44aa44'; // Green for low risk
   };
 
   const tableBorderColor = useThemeColor({}, 'tint');
 
   const renderItem = ({ item }: { item: Profile }) => (
     <View style={[styles.dataRow, { borderBottomColor: tableBorderColor }]}>
-      <ThemedText style={[styles.dataCell, styles.idCell]} numberOfLines={1}>
-        {item.id.substring(0, 8)}...
-      </ThemedText>
       <ThemedText style={[styles.dataCell, styles.nameCell]} numberOfLines={1}>
         {item.full_name || 'N/A'}
       </ThemedText>
-      <ThemedText style={[styles.dataCell, styles.emailCell]} numberOfLines={1}>
-        {item.email || 'N/A'}
-      </ThemedText>
-      <ThemedText style={[styles.dataCell, styles.dateCell]}>
-        {formatDate(item.created_at)}
+      <ThemedText 
+        style={[
+          styles.dataCell, 
+          styles.riskCell, 
+          { color: getRiskLevelColor(item.risk_level) }
+        ]}
+      >
+        {item.risk_level || 'N/A'}
       </ThemedText>
     </View>
   );
 
   const ListHeader = () => (
     <View style={[styles.headerRow, { borderBottomColor: tableBorderColor }]}>
-      <ThemedText style={[styles.headerCell, styles.idCell]}>ID</ThemedText>
       <ThemedText style={[styles.headerCell, styles.nameCell]}>Full Name</ThemedText>
-      <ThemedText style={[styles.headerCell, styles.emailCell]}>Email</ThemedText>
-      <ThemedText style={[styles.headerCell, styles.dateCell]}>Created</ThemedText>
+      <ThemedText style={[styles.headerCell, styles.riskCell]}>Risk Level</ThemedText>
     </View>
   );
 
@@ -113,7 +114,7 @@ export default function AuthDataTable() {
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>
-        User Profiles
+        User Risk Levels
       </ThemedText>
       <FlatList
         data={profiles}
@@ -159,17 +160,12 @@ const styles = StyleSheet.create({
   dataCell: {
     textAlign: 'left',
   },
-  idCell: {
-    flex: 0.3,
-  },
   nameCell: {
-    flex: 0.4,
+    flex: 0.7,
   },
-  emailCell: {
-    flex: 0.6,
-  },
-  dateCell: {
-    flex: 0.4,
+  riskCell: {
+    flex: 0.3,
+    fontWeight: 'bold',
     textAlign: 'right',
   },
   emptyContainer: {
