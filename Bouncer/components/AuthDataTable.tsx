@@ -1,24 +1,45 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 // Define an interface for the data from the 'profiles' table
 interface Profile {
   id: string;
-  full_name?: string;
-  email?: string;
+  full_name: string | null;
+  email: string | null;
+  risk_level: number | null;
   created_at: string;
-  risk_level?: number;
-  // Add other fields from your 'profiles' table here
 }
 
-export default function AuthDataTable() {
+interface AuthDataTableProps {
+  lowRiskThreshold?: number;
+  highRiskThreshold?: number;
+}
+
+export default function AuthDataTable({ 
+  lowRiskThreshold = 33, 
+  highRiskThreshold = 66 
+}: AuthDataTableProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = useThemeColor({}, 'text') + '20';
+
+  const getRiskColor = (riskLevel: number) => {
+    if (riskLevel <= lowRiskThreshold) {
+      return '#44aa44'; // Solid green for low risk
+    } else if (riskLevel <= highRiskThreshold) {
+      return '#ffaa00'; // Solid orange for medium risk
+    } else {
+      return '#ff4444'; // Solid red for high risk
+    }
+  };
 
   useEffect(() => {
     fetchProfilesData();
@@ -27,7 +48,7 @@ export default function AuthDataTable() {
   const fetchProfilesData = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setRefreshing(false);
       
       // Query the public.profiles table
       const { data, error } = await supabase
@@ -37,54 +58,43 @@ export default function AuthDataTable() {
 
       if (error) {
         console.error('Error fetching profiles data:', error);
-        setError('Failed to fetch data from the "profiles" table. Please check your RLS policies.');
         return;
       }
 
       if (!data || data.length === 0) {
-        setError('No profiles found in the "profiles" table.');
         return;
       }
 
       setProfiles(data);
     } catch (err) {
       console.error('Error:', err);
-      setError('An unexpected error occurred.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getRiskLevelColor = (riskLevel: number | undefined) => {
-    if (!riskLevel) return '#999';
-    if (riskLevel > 50) return '#ff4444'; // Red for high risk
-    if (riskLevel > 25) return '#ffaa00'; // Orange for medium risk
-    return '#44aa44'; // Green for low risk
-  };
-
-  const tableBorderColor = useThemeColor({}, 'tint');
-
   const renderItem = ({ item }: { item: Profile }) => (
-    <View style={[styles.dataRow, { borderBottomColor: tableBorderColor }]}>
-      <ThemedText style={[styles.dataCell, styles.nameCell]} numberOfLines={1}>
-        {item.full_name || 'N/A'}
-      </ThemedText>
-      <ThemedText 
-        style={[
-          styles.dataCell, 
-          styles.riskCell, 
-          { color: getRiskLevelColor(item.risk_level) }
-        ]}
-      >
-        {item.risk_level || 'N/A'}
-      </ThemedText>
+    <View 
+      style={[
+        styles.tableRow, 
+        { 
+          borderBottomColor: borderColor,
+          backgroundColor: item.risk_level !== null ? getRiskColor(item.risk_level) : undefined
+        }
+      ]}
+    >
+      <Text style={[styles.cell, { color: textColor }]}>{item.full_name || 'N/A'}</Text>
+      <Text style={[styles.cell, { color: textColor }]}>{item.email || 'N/A'}</Text>
+      <Text style={[styles.cell, styles.riskCell, { color: textColor }]}>{item.risk_level ?? 'N/A'}</Text>
     </View>
   );
 
   const ListHeader = () => (
-    <View style={[styles.headerRow, { borderBottomColor: tableBorderColor }]}>
-      <ThemedText style={[styles.headerCell, styles.nameCell]}>Full Name</ThemedText>
-      <ThemedText style={[styles.headerCell, styles.riskCell]}>Risk Level</ThemedText>
+    <View style={[styles.tableRow, styles.tableHeader, { borderBottomColor: borderColor }]}>
+      <Text style={[styles.headerCell, { color: textColor }]}>Name</Text>
+      <Text style={[styles.headerCell, { color: textColor }]}>Email</Text>
+      <Text style={[styles.headerCell, styles.riskCell, { color: textColor }]}>Risk Level</Text>
     </View>
   );
 
@@ -103,27 +113,55 @@ export default function AuthDataTable() {
     );
   }
 
-  if (error) {
-    return (
-      <ThemedView style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
-      </ThemedView>
-    );
-  }
-
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.title}>
         User Risk Levels
       </ThemedText>
-      <FlatList
-        data={profiles}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={EmptyList}
-        style={styles.list}
-      />
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={fetchProfilesData}
+          />
+        }
+      >
+        <View style={styles.table}>
+          {/* Table Header */}
+          <View style={[styles.tableRow, styles.tableHeader, { borderBottomColor: borderColor }]}>
+            <Text style={[styles.headerCell, { color: textColor }]}>Name</Text>
+            <Text style={[styles.headerCell, { color: textColor }]}>Email</Text>
+            <Text style={[styles.headerCell, styles.riskCell, { color: textColor }]}>Risk Level</Text>
+          </View>
+
+          {/* Table Body */}
+          {profiles.map((profile) => (
+            <View 
+              key={profile.id} 
+              style={[
+                styles.tableRow, 
+                { borderBottomColor: borderColor }
+              ]}
+            >
+              <Text style={[styles.cell, { color: textColor }]}>{profile.full_name || 'N/A'}</Text>
+              <Text style={[styles.cell, { color: textColor }]}>{profile.email || 'N/A'}</Text>
+              <Text 
+                style={[
+                  styles.cell, 
+                  styles.riskCell, 
+                  { 
+                    color: profile.risk_level !== null ? getRiskColor(profile.risk_level) : textColor,
+                    fontWeight: 'bold'
+                  }
+                ]}
+              >
+                {profile.risk_level ?? 'N/A'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -134,33 +172,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  list: {
+  scrollView: {
     flex: 1,
   },
   title: {
     marginBottom: 24,
     textAlign: 'left',
   },
-  headerRow: {
+  table: {
+    flex: 1,
+  },
+  tableRow: {
     flexDirection: 'row',
-    borderBottomWidth: 2,
-    paddingBottom: 12,
-    marginBottom: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   headerCell: {
     fontWeight: 'bold',
     textAlign: 'left',
   },
-  dataRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  dataCell: {
-    textAlign: 'left',
-  },
-  nameCell: {
+  cell: {
     flex: 0.7,
   },
   riskCell: {
@@ -186,26 +217,9 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
-    color: '#ff4444',
-    textAlign: 'center',
-  },
-  helpText: {
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    marginTop: 16,
-  },
-  setupButton: {
-    color: '#007AFF',
-    textAlign: 'center',
-    padding: 8,
+  tableHeader: {
+    borderBottomWidth: 2,
+    paddingBottom: 12,
+    marginBottom: 8,
   },
 }); 

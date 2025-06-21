@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
@@ -19,7 +19,11 @@ interface ScanResult {
   error?: string;
 }
 
-export default function RiskAlertScanner() {
+interface RiskAlertScannerProps {
+  highRiskThreshold?: number;
+}
+
+export default function RiskAlertScanner({ highRiskThreshold = 66 }: RiskAlertScannerProps) {
   const [scanning, setScanning] = useState(false);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
@@ -76,13 +80,13 @@ export default function RiskAlertScanner() {
     setResults([]);
 
     try {
-      console.log('🔍 Scanning database for high-risk users...');
+      console.log(`🔍 Scanning database for users with risk level > ${highRiskThreshold}...`);
 
-      // Fetch all profiles with risk_level > 50
+      // Fetch all profiles with risk_level > highRiskThreshold
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
-        .gt('risk_level', 50)
+        .gt('risk_level', highRiskThreshold)
         .order('risk_level', { ascending: false });
 
       if (error) {
@@ -154,18 +158,21 @@ export default function RiskAlertScanner() {
       </ThemedText>
       
       <ThemedText style={styles.description}>
-        Scan the database for users with risk level > 50 and send email alerts.
+        Scan the database for users with risk level {'>'} {highRiskThreshold} and send email alerts.
       </ThemedText>
 
       {/* Scan Button */}
-      <View style={[styles.button, { backgroundColor: tintColor }]}>
+      <TouchableOpacity 
+        style={[styles.button, { backgroundColor: tintColor }]}
+        onPress={scanning ? undefined : scanForHighRiskUsers}
+        disabled={scanning}
+      >
         <ThemedText 
-          style={[styles.buttonText, { color: 'white' }]}
-          onPress={scanning ? undefined : scanForHighRiskUsers}
+          style={[styles.buttonText, { color: backgroundColor }]}
         >
           {scanning ? '🔍 Scanning...' : '🔍 Scan for High-Risk Users'}
         </ThemedText>
-      </View>
+      </TouchableOpacity>
 
       {/* Status Information */}
       {lastScanTime && (
