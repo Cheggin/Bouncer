@@ -8,7 +8,7 @@ dotenv.load_dotenv()
 CUSTOM_SEARCH_API = os.getenv("CUSTOM-SEARCH-API")
 SEARCH_ENGINE_ID = os.getenv("SEARCH-ENGINE-ID")
 
-def rs_email(email, num_results=10):
+def rs(text, num_results=10):
     """
     Perform a Google Custom Search for pages containing the given email address.
     """
@@ -16,7 +16,7 @@ def rs_email(email, num_results=10):
     params = {
         "key": CUSTOM_SEARCH_API,
         "cx": SEARCH_ENGINE_ID,
-        "q": f"intext:{email}",
+        "q": f"intext:{text}",
         "num": num_results
     }
     
@@ -34,12 +34,13 @@ def rs_email(email, num_results=10):
     return results
 
 def main():
-    parser = argparse.ArgumentParser(description="Search Google Custom Search for an email address.")
-    parser.add_argument("email", help="Email address to search for.")
+    # testing
+    parser = argparse.ArgumentParser(description="Search Google Custom Search for any text.")
+    parser.add_argument("text", help="Text to search for.")
     parser.add_argument("--results", type=int, default=10, help="Number of search results to retrieve.")
     args = parser.parse_args()
 
-    found = rs_email(args.email, num_results=args.results)
+    found = rs(args.email, num_results=args.results)
     for idx, entry in enumerate(found, 1):
         print(f"Result {idx}:")
         print(f" -> Title: {entry['title']}")
