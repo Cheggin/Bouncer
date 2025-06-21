@@ -1,91 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
-interface AuthUser {
+// Define an interface for the data from the 'profiles' table
+interface Profile {
   id: string;
+  full_name?: string;
   email?: string;
   created_at: string;
-  updated_at?: string;
-  last_sign_in_at?: string;
-  role?: string;
+  // Add other fields from your 'profiles' table here
 }
 
 export default function AuthDataTable() {
-  const [users, setUsers] = useState<AuthUser[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAuthData();
+    fetchProfilesData();
   }, []);
 
-  const fetchAuthData = async () => {
+  const fetchProfilesData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Try multiple approaches to get auth data
-      let data = null;
-      let error = null;
-
-      // Approach 1: Try using a function (if it exists)
-      try {
-        const result = await supabase.rpc('get_auth_users');
-        if (result.data && !result.error) {
-          data = result.data;
-        }
-      } catch (funcError) {
-        console.log('Function approach failed, trying view...');
-      }
-
-      // Approach 2: Try using the view (if it exists)
-      if (!data) {
-        try {
-          const result = await supabase
-            .from('auth_users_view')
-            .select('*')
-            .order('created_at', { ascending: false });
-          data = result.data;
-          error = result.error;
-        } catch (viewError) {
-          console.log('View approach failed');
-        }
-      }
-
-      // Approach 3: Try to get current user info as a fallback
-      if (!data) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            data = [{
-              id: user.id,
-              email: user.email,
-              created_at: user.created_at,
-              updated_at: user.updated_at,
-              last_sign_in_at: user.last_sign_in_at,
-              role: user.user_metadata?.role || 'user'
-            }];
-          }
-        } catch (userError) {
-          console.log('User approach failed');
-        }
-      }
+      // Query the public.profiles table
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching auth data:', error);
-        setError('Failed to fetch authentication data. Please check your Supabase configuration.');
+        console.error('Error fetching profiles data:', error);
+        setError('Failed to fetch data from the "profiles" table. Please check your RLS policies.');
         return;
       }
 
       if (!data || data.length === 0) {
-        setError('No authentication data found. You may need to set up the database view or function.');
+        setError('No profiles found in the "profiles" table.');
         return;
       }
 
-      setUsers(data);
+      setProfiles(data);
     } catch (err) {
       console.error('Error:', err);
       setError('An unexpected error occurred.');
@@ -94,46 +54,50 @@ export default function AuthDataTable() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
   };
 
-  const showSetupInstructions = () => {
-    Alert.alert(
-      'Setup Required',
-      'To display authentication data, you need to create a database view or function in your Supabase dashboard. Check the SUPABASE_SETUP.md file for detailed instructions.',
-      [
-        { text: 'OK', style: 'default' },
-        { text: 'Copy SQL', onPress: copySetupSQL }
-      ]
-    );
-  };
+  const tableBorderColor = useThemeColor({}, 'tint');
 
-  const copySetupSQL = () => {
-    const sql = `-- Create a view to expose auth users data
-CREATE OR REPLACE VIEW auth_users_view AS
-SELECT 
-  id,
-  email,
-  created_at,
-  updated_at,
-  last_sign_in_at,
-  raw_user_meta_data->>'role' as role
-FROM auth.users;
+  const renderItem = ({ item }: { item: Profile }) => (
+    <View style={[styles.dataRow, { borderBottomColor: tableBorderColor }]}>
+      <ThemedText style={[styles.dataCell, styles.idCell]} numberOfLines={1}>
+        {item.id.substring(0, 8)}...
+      </ThemedText>
+      <ThemedText style={[styles.dataCell, styles.nameCell]} numberOfLines={1}>
+        {item.full_name || 'N/A'}
+      </ThemedText>
+      <ThemedText style={[styles.dataCell, styles.emailCell]} numberOfLines={1}>
+        {item.email || 'N/A'}
+      </ThemedText>
+      <ThemedText style={[styles.dataCell, styles.dateCell]}>
+        {formatDate(item.created_at)}
+      </ThemedText>
+    </View>
+  );
 
--- Grant access to the view
-GRANT SELECT ON auth_users_view TO authenticated;
-GRANT SELECT ON auth_users_view TO anon;`;
-    
-    // For web, we can't directly copy to clipboard, but we can show it
-    Alert.alert('SQL Commands', sql);
-  };
+  const ListHeader = () => (
+    <View style={[styles.headerRow, { borderBottomColor: tableBorderColor }]}>
+      <ThemedText style={[styles.headerCell, styles.idCell]}>ID</ThemedText>
+      <ThemedText style={[styles.headerCell, styles.nameCell]}>Full Name</ThemedText>
+      <ThemedText style={[styles.headerCell, styles.emailCell]}>Email</ThemedText>
+      <ThemedText style={[styles.headerCell, styles.dateCell]}>Created</ThemedText>
+    </View>
+  );
+
+  const EmptyList = () => (
+    <ThemedView style={styles.emptyContainer}>
+      <ThemedText style={styles.emptyText}>No profiles found</ThemedText>
+    </ThemedView>
+  );
 
   if (loading) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        <ThemedText style={styles.loadingText}>Loading authentication data...</ThemedText>
+        <ThemedText style={styles.loadingText}>Loading Profiles Data...</ThemedText>
       </ThemedView>
     );
   }
@@ -142,74 +106,23 @@ GRANT SELECT ON auth_users_view TO anon;`;
     return (
       <ThemedView style={styles.errorContainer}>
         <ThemedText style={styles.errorText}>{error}</ThemedText>
-        <ThemedText style={styles.helpText}>
-          Make sure you have:
-        </ThemedText>
-        <ThemedText style={styles.helpText}>
-          • Set up your Supabase environment variables
-        </ThemedText>
-        <ThemedText style={styles.helpText}>
-          • Created a view or function to access auth.users
-        </ThemedText>
-        <ThemedText style={styles.helpText}>
-          • Proper RLS policies configured
-        </ThemedText>
-        <View style={styles.buttonContainer}>
-          <Text style={styles.setupButton} onPress={showSetupInstructions}>
-            View Setup Instructions
-          </Text>
-        </View>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText type="subtitle" style={styles.title}>
-        Authentication Users ({users.length})
+      <ThemedText type="title" style={styles.title}>
+        User Profiles
       </ThemedText>
-      
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.tableContainer}>
-            {/* Header */}
-            <View style={styles.headerRow}>
-              <Text style={styles.headerCell}>ID</Text>
-              <Text style={styles.headerCell}>Email</Text>
-              <Text style={styles.headerCell}>Created</Text>
-              <Text style={styles.headerCell}>Last Sign In</Text>
-              <Text style={styles.headerCell}>Role</Text>
-            </View>
-            
-            {/* Data Rows */}
-            {users.map((user) => (
-              <View key={user.id} style={styles.dataRow}>
-                <Text style={styles.dataCell} numberOfLines={1}>
-                  {user.id.substring(0, 8)}...
-                </Text>
-                <Text style={styles.dataCell} numberOfLines={1}>
-                  {user.email || 'N/A'}
-                </Text>
-                <Text style={styles.dataCell}>
-                  {formatDate(user.created_at)}
-                </Text>
-                <Text style={styles.dataCell}>
-                  {user.last_sign_in_at ? formatDate(user.last_sign_in_at) : 'Never'}
-                </Text>
-                <Text style={styles.dataCell}>
-                  {user.role || 'user'}
-                </Text>
-              </View>
-            ))}
-            
-            {users.length === 0 && (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>No users found</Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </ScrollView>
+      <FlatList
+        data={profiles}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={EmptyList}
+        style={styles.list}
+      />
     </ThemedView>
   );
 }
@@ -217,83 +130,86 @@ GRANT SELECT ON auth_users_view TO anon;`;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  list: {
+    flex: 1,
   },
   title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    overflow: 'hidden',
+    marginBottom: 24,
+    textAlign: 'left',
   },
   headerRow: {
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomWidth: 2,
+    paddingBottom: 12,
+    marginBottom: 8,
   },
   headerCell: {
-    flex: 1,
-    padding: 12,
     fontWeight: 'bold',
-    textAlign: 'center',
-    minWidth: 100,
+    textAlign: 'left',
   },
   dataRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    alignItems: 'center',
+    paddingVertical: 16,
   },
   dataCell: {
-    flex: 1,
-    padding: 12,
-    textAlign: 'center',
-    minWidth: 100,
+    textAlign: 'left',
   },
-  emptyRow: {
-    padding: 20,
+  idCell: {
+    flex: 0.3,
+  },
+  nameCell: {
+    flex: 0.4,
+  },
+  emailCell: {
+    flex: 0.6,
+  },
+  dateCell: {
+    flex: 0.4,
+    textAlign: 'right',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 50,
   },
   emptyText: {
-    color: '#666',
     fontStyle: 'italic',
+    fontSize: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 8,
   },
   errorContainer: {
     flex: 1,
-    padding: 20,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   errorText: {
-    color: 'red',
+    color: '#ff4444',
     textAlign: 'center',
-    marginBottom: 16,
   },
   helpText: {
+    marginTop: 8,
     textAlign: 'center',
-    marginBottom: 4,
-    fontSize: 12,
   },
   buttonContainer: {
     marginTop: 16,
   },
   setupButton: {
-    backgroundColor: '#007AFF',
-    color: 'white',
-    padding: 12,
-    borderRadius: 8,
+    color: '#007AFF',
     textAlign: 'center',
-    fontWeight: 'bold',
+    padding: 8,
   },
 }); 
