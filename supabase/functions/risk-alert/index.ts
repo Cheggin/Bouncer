@@ -11,7 +11,7 @@ serve(async (req) => {
     // Check if the risk level is above the threshold
     if (profile && profile.risk_level > 50) {
       const { data, error } = await resend.emails.send({
-        from: 'Bouncer Risk Alert <onboarding@resend.dev>',
+        from: 'Bouncer Risk Alert <bouncer@bouncer-app.com>',
         to: ['reaganhsu123@gmail.com'],
         subject: `🚨 High Risk User Alert: ${profile.full_name || 'N/A'}`,
         html: `
