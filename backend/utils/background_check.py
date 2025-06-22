@@ -3,6 +3,10 @@ import argparse
 import dotenv 
 import os
 import google.generativeai as genai
+import time
+import urllib.request
+import base64
+import tempfile
 
 
 # Load environment variables from .env file
@@ -10,6 +14,10 @@ dotenv.load_dotenv()
 CUSTOM_SEARCH_API = os.getenv("CUSTOM-SEARCH-API")
 SEARCH_ENGINE_ID = os.getenv("SEARCH-ENGINE-ID")
 GEMINI_API = os.getenv("GEMINI-API")
+
+# Facecheck.id configuration
+FACECHECK_TESTING_MODE = True
+FACECHECK_APITOKEN = 'xgLcs2i47YQtIWEXxhrgacF2wmVk0PwT1WBf/YOXlCoyWA6RqFIw4iWNa+vPOD4KEwN0hyn2do4='
 
 genai.configure(api_key=GEMINI_API)
 
@@ -78,6 +86,70 @@ def deep_search(results_json):
 
     return summaries
 
+def search_by_face(image_file_path):
+    """
+    Perform reverse image search using facecheck.id
+    """
+    if FACECHECK_TESTING_MODE:
+        print('****** TESTING MODE search, results are inaccurate, and queue wait is long, but credits are NOT deducted ******')
+
+    site = 'https://facecheck.id'
+    headers = {'accept': 'application/json', 'Authorization': FACECHECK_APITOKEN}
+    
+    with open(image_file_path, 'rb') as f:
+        files = {'images': f, 'id_search': None}
+        response = requests.post(site + '/api/upload_pic', headers=headers, files=files).json()
+
+    if response['error']:
+        raise Exception(f"{response['error']} ({response['code']})")
+
+    id_search = response['id_search']
+    print(response['message'] + ' id_search=' + id_search)
+    json_data = {'id_search': id_search, 'with_progress': True, 'status_only': False, 'demo': FACECHECK_TESTING_MODE}
+
+    while True:
+        response = requests.post(site + '/api/search', headers=headers, json=json_data).json()
+        if response['error']:
+            raise Exception(f"{response['error']} ({response['code']})")
+        if response['output']:
+            return response['output']['items']
+        print(f'{response["message"]} progress: {response["progress"]}%')
+        time.sleep(1)
+
+def face_search(image_data, num_results=3):
+    """
+    Wrapper function for face search that handles image data and formats results
+    consistently with the existing API format.
+    Returns the top 3 most similar faces sorted by similarity score.
+    """
+    # Create a temporary file to store the uploaded image
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+        temp_file.write(image_data)
+        temp_file_path = temp_file.name
+
+    try:
+        # Perform the face search
+        raw_results = search_by_face(temp_file_path)
+        
+        # Sort results by similarity score in descending order (highest scores first)
+        sorted_results = sorted(raw_results, key=lambda x: x['score'], reverse=True)
+        
+        # Format results to match existing API structure, taking top 3 most similar
+        results = []
+        for i, item in enumerate(sorted_results[:3]):  # Always take top 3 most similar
+            results.append({
+                "title": f"Face Match (Score: {item['score']}%)",
+                "link": item['url'],
+                "snippet": f"Face similarity score: {item['score']}% - Found on webpage"
+            })
+        
+        return results
+        
+    finally:
+        # Clean up temporary file
+        import os
+        if os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
 
 def main():
     # testing

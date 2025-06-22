@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request, Response, stream_with_context
 from flask_cors import CORS # were probably gonna need this for some reason
 
-from utils.background_check import rs
+from utils.background_check import rs, face_search
 
 app = Flask(__name__)
 CORS(app)
@@ -41,5 +41,32 @@ def rs_query():
         # 4. catch HTTP-errors from requests or whatever
         return jsonify({"error": str(e)}), 500
 
+@app.route('/face-search', methods=['POST'])
+def face_search_query():
+    # Check if an image file was uploaded
+    if 'image' not in request.files:
+        return jsonify({"error": "Request must include an image file with key 'image'"}), 400
+    
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No image file selected"}), 400
+    
+    # Check file type (optional but recommended)
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+    if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+        return jsonify({"error": "Invalid file type. Supported formats: png, jpg, jpeg, gif, bmp, webp"}), 400
+    
+    try:
+        # Read the image data
+        image_data = file.read()
+        
+        # Perform face search (always returns top 3 most similar results)
+        results = face_search(image_data)
+        
+        return jsonify({"results": results}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
