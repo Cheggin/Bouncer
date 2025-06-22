@@ -1,7 +1,8 @@
-import { StyleSheet, View, SafeAreaView } from 'react-native';
+import { StyleSheet, View, SafeAreaView, TouchableOpacity } from 'react-native';
 import { ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 import AuthDataTable from '@/components/AuthDataTable';
 import RiskAlertScanner from '@/components/RiskAlertScanner';
@@ -15,6 +16,7 @@ export default function HomeScreen() {
   const [lowThreshold, setLowThreshold] = useState(33);
   const [highThreshold, setHighThreshold] = useState(66);
   const [claudePrompt, setClaudePrompt] = useState('You are a risk assessment AI analyzing user data for potential security threats. Analyze the following user information and provide a risk score from 0-100.');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleThresholdsChange = (low: number, high: number) => {
     setLowThreshold(low);
@@ -24,6 +26,11 @@ export default function HomeScreen() {
 
   const handlePromptChange = (prompt: string) => {
     setClaudePrompt(prompt);
+  };
+
+  const handleRefresh = () => {
+    console.log('🔄 Manual refresh triggered from header');
+    setRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -45,6 +52,19 @@ export default function HomeScreen() {
                 Real-time security monitoring
               </ThemedText>
             </View>
+            
+            {/* Refresh Button */}
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name="refresh" 
+                size={20} 
+                color={DesignTokens.colors['white-000']} 
+              />
+            </TouchableOpacity>
           </LinearGradient>
 
           {/* Scrollable Content */}
@@ -85,6 +105,7 @@ export default function HomeScreen() {
                 lowRiskThreshold={lowThreshold}
                 highRiskThreshold={highThreshold}
                 claudePrompt={claudePrompt}
+                refreshKey={refreshKey}
               />
             </View>
 
@@ -134,9 +155,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: DesignTokens.colors['gray-700'],
     ...DesignTokens.shadows.subtle,
+    position: 'relative',
   },
   headerContent: {
     alignItems: 'center',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: DesignTokens.colors['gray-700'],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: DesignTokens.colors['gray-600'],
   },
   headerTitle: {
     color: DesignTokens.colors['white-000'],

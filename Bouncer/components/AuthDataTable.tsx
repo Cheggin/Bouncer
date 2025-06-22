@@ -24,12 +24,14 @@ interface AuthDataTableProps {
   lowRiskThreshold?: number;
   highRiskThreshold?: number;
   claudePrompt?: string;
+  refreshKey?: number;
 }
 
 export default function AuthDataTable({ 
   lowRiskThreshold = 33, 
   highRiskThreshold = 66,
-  claudePrompt = 'You are a risk assessment AI analyzing user data for potential security threats. Analyze the following user information and provide a risk score from 0-100.'
+  claudePrompt = 'You are a risk assessment AI analyzing user data for potential security threats. Analyze the following user information and provide a risk score from 0-100.',
+  refreshKey = 0
 }: AuthDataTableProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,14 @@ export default function AuthDataTable({
   useEffect(() => {
     fetchProfilesData();
   }, []);
+
+  // Refresh when refreshKey changes
+  useEffect(() => {
+    if (refreshKey > 0) {
+      console.log('🔄 Refreshing data due to refresh key change:', refreshKey);
+      fetchProfilesData();
+    }
+  }, [refreshKey]);
 
   const fetchProfilesData = async () => {
     try {
