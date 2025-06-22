@@ -18,6 +18,13 @@ interface Profile {
   risk_analysis?: string | null;
   risk_factors?: string[] | null;
   reasoning_summary?: { explanation: string } | null;
+  raw_json?: { summaries: { [key: string]: { 
+    link?: string; 
+    snippet?: string; 
+    source?: string; 
+    summary?: string; 
+    title?: string; 
+  } } } | null;
   created_at: string;
 }
 
@@ -41,6 +48,7 @@ export default function AuthDataTable({
   const [calculationProgress, setCalculationProgress] = useState<string>('');
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -56,6 +64,25 @@ export default function AuthDataTable({
   // Toggle row expansion for AI explanation
   const toggleRowExpansion = (profileId: string) => {
     setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(profileId)) {
+        newSet.delete(profileId);
+        // Also close sources when main row closes
+        setExpandedSources(sourcePrev => {
+          const newSourceSet = new Set(sourcePrev);
+          newSourceSet.delete(profileId);
+          return newSourceSet;
+        });
+      } else {
+        newSet.add(profileId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle source expansion within AI explanation
+  const toggleSourceExpansion = (profileId: string) => {
+    setExpandedSources(prev => {
       const newSet = new Set(prev);
       if (newSet.has(profileId)) {
         newSet.delete(profileId);
@@ -219,6 +246,50 @@ export default function AuthDataTable({
             <ThemedText type="small" style={styles.explanationText}>
               {item.reasoning_summary?.explanation || 'No explanation available'}
             </ThemedText>
+            
+            {/* Sources cascaded dropdown */}
+            {item.raw_json?.summaries && Object.keys(item.raw_json.summaries).length > 0 && (
+              <View style={styles.sourcesContainer}>
+                <TouchableOpacity 
+                  style={styles.sourcesHeader}
+                  onPress={() => toggleSourceExpansion(item.id)}
+                >
+                  <ThemedText type="small" style={styles.sourcesTitle}>
+                    📋 View Sources ({Object.keys(item.raw_json.summaries).length})
+                  </ThemedText>
+                  <Text style={styles.sourcesIndicator}>
+                    {expandedSources.has(item.id) ? '▼' : '▶'}
+                  </Text>
+                </TouchableOpacity>
+                
+                {expandedSources.has(item.id) && (
+                  <View style={styles.sourcesContent}>
+                    {Object.entries(item.raw_json.summaries).map(([sourceKey, sourceData], index) => (
+                      <View key={index} style={styles.sourceItem}>
+                        <ThemedText type="small" style={styles.sourceTitle}>
+                          {sourceData.title || sourceData.source || sourceKey}
+                        </ThemedText>
+                        {sourceData.summary && (
+                          <ThemedText type="small" style={styles.sourceText}>
+                            {sourceData.summary}
+                          </ThemedText>
+                        )}
+                        {sourceData.snippet && (
+                          <ThemedText type="small" style={styles.sourceSnippet}>
+                            "{sourceData.snippet}"
+                          </ThemedText>
+                        )}
+                        {sourceData.link && (
+                          <ThemedText type="small" style={styles.sourceLink}>
+                            🔗 {sourceData.link}
+                          </ThemedText>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -403,5 +474,60 @@ const styles = StyleSheet.create({
   explanationText: {
     color: DesignTokens.colors['gray-200'],
     lineHeight: 18,
+  },
+  sourcesContainer: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: DesignTokens.colors['gray-600'],
+    paddingTop: 12,
+  },
+  sourcesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  sourcesTitle: {
+    color: DesignTokens.colors['gray-300'],
+    fontWeight: '600',
+  },
+  sourcesIndicator: {
+    fontSize: 10,
+    color: DesignTokens.colors['gray-400'],
+  },
+  sourcesContent: {
+    marginTop: 8,
+    paddingLeft: 8,
+  },
+  sourceItem: {
+    marginBottom: 12,
+    backgroundColor: DesignTokens.colors['gray-900'],
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: DesignTokens.colors['gray-500'],
+  },
+  sourceTitle: {
+    color: DesignTokens.colors['gray-200'],
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  sourceText: {
+    color: DesignTokens.colors['gray-300'],
+    lineHeight: 16,
+    fontSize: 12,
+  },
+  sourceSnippet: {
+    color: DesignTokens.colors['gray-400'],
+    lineHeight: 16,
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  sourceLink: {
+    color: DesignTokens.colors['gray-500'],
+    lineHeight: 16,
+    fontSize: 10,
+    marginTop: 4,
   },
 }); 
