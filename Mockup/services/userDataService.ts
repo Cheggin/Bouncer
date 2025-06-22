@@ -9,6 +9,10 @@ export interface UserProfile {
   city?: string;
   zip_code?: string;
   created_at?: string;
+  avatar_url?: string | null;
+  membership_level?: string | null;
+  total_orders?: number;
+  favorite_items?: number;
 }
 
 export const upsertUserData = async (userId: string, userData: Partial<UserProfile>): Promise<void> => {
@@ -61,5 +65,37 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
   } catch (error) {
     console.error('Error in updateUserProfile:', error);
     throw error;
+  }
+};
+
+export const getUserStats = async (userId: string): Promise<{ totalOrders: number; favoriteItems: number }> => {
+  try {
+    // Get total orders count
+    const { count: ordersCount, error: ordersError } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (ordersError) {
+      console.error('Error fetching orders count:', ordersError);
+    }
+
+    // Get favorite items count
+    const { count: favoritesCount, error: favoritesError } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (favoritesError) {
+      console.error('Error fetching favorites count:', favoritesError);
+    }
+
+    return {
+      totalOrders: ordersCount || 0,
+      favoriteItems: favoritesCount || 0
+    };
+  } catch (error) {
+    console.error('Error in getUserStats:', error);
+    return { totalOrders: 0, favoriteItems: 0 };
   }
 }; 

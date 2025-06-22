@@ -23,6 +23,7 @@ export default function RiskPromptBox({
   const [activeHandle, setActiveHandle] = useState<'low' | 'high' | null>(null);
   const sliderRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [trackLeft, setTrackLeft] = useState(0);
   
   const handleWidth = 20;
   const sliderWidth = trackWidth > 0 ? trackWidth - handleWidth : 0;
@@ -60,10 +61,17 @@ export default function RiskPromptBox({
     }
   };
 
+  // Function to calculate percentage from absolute position
+  const calculatePercentage = (absoluteX: number) => {
+    if (sliderWidth <= 0) return 0;
+    const relativeX = absoluteX - trackLeft;
+    return Math.max(0, Math.min(100, (relativeX / sliderWidth) * 100));
+  };
+
   // Function to handle slider press (only on the track)
   const handleSliderPress = (event: any) => {
     const { locationX } = event.nativeEvent;
-    const percentage = Math.max(0, Math.min(100, (locationX / sliderWidth) * 100));
+    const percentage = calculatePercentage(locationX);
     
     // Determine which handle to move based on proximity
     const lowDistance = Math.abs(percentage - lowThreshold);
@@ -86,14 +94,16 @@ export default function RiskPromptBox({
   const lowHandlePanResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onPanResponderGrant: (evt) => {
       setActiveHandle('low');
     },
     onPanResponderMove: (evt, gestureState) => {
       if (sliderWidth <= 0) return;
-      const { dx } = gestureState;
-      const deltaPercentage = (dx / sliderWidth) * 100;
-      const newLow = Math.max(0, Math.min(highThreshold - 5, lowThreshold + deltaPercentage));
+      
+      // Get the absolute position and calculate relative percentage
+      const { pageX } = evt.nativeEvent;
+      const percentage = calculatePercentage(pageX);
+      const newLow = Math.max(0, Math.min(highThreshold - 5, percentage));
       updateThresholds(newLow, highThreshold);
     },
     onPanResponderRelease: () => {
@@ -105,14 +115,16 @@ export default function RiskPromptBox({
   const highHandlePanResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onPanResponderGrant: (evt) => {
       setActiveHandle('high');
     },
     onPanResponderMove: (evt, gestureState) => {
       if (sliderWidth <= 0) return;
-      const { dx } = gestureState;
-      const deltaPercentage = (dx / sliderWidth) * 100;
-      const newHigh = Math.max(lowThreshold + 5, Math.min(100, highThreshold + deltaPercentage));
+      
+      // Get the absolute position and calculate relative percentage
+      const { pageX } = evt.nativeEvent;
+      const percentage = calculatePercentage(pageX);
+      const newHigh = Math.max(lowThreshold + 5, Math.min(100, percentage));
       updateThresholds(lowThreshold, newHigh);
     },
     onPanResponderRelease: () => {
@@ -186,23 +198,34 @@ export default function RiskPromptBox({
         
         <View 
           style={styles.sliderWrapper}
-          onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+          ref={sliderRef}
+          onLayout={(event) => {
+            setTrackWidth(event.nativeEvent.layout.width);
+            // Measure the absolute position of the slider track
+            sliderRef.current?.measureInWindow((x, y, width, height) => {
+              setTrackLeft(x);
+            });
+          }}
         >
           {/* Layered Color Bar */}
-          <View style={styles.sliderTrack}>
+          <TouchableOpacity 
+            style={styles.sliderTrack}
+            onPress={handleSliderPress}
+            activeOpacity={0.8}
+          >
             {/* High Risk Zone (Base Layer) */}
             <View style={[styles.riskZone, { backgroundColor: '#ff4444' }]} />
             {/* Medium Risk Zone */}
             <View style={[styles.riskZone, { backgroundColor: '#ffaa00', width: `${highThreshold}%` }]} />
             {/* Low Risk Zone */}
             <View style={[styles.riskZone, { backgroundColor: '#44aa44', width: `${lowThreshold}%` }]} />
-          </View>
+          </TouchableOpacity>
 
           {/* Low Threshold Handle */}
           <View
             style={[
               styles.sliderHandle,
-              { left: `${lowThreshold}%`, marginLeft: -10 }
+              { left: `${lowThreshold}%`, transform: [{ translateX: -10 }] }
             ]}
             {...lowHandlePanResponder.panHandlers}
           >
@@ -213,7 +236,7 @@ export default function RiskPromptBox({
           <View
             style={[
               styles.sliderHandle,
-              { left: `${highThreshold}%`, marginLeft: -10 }
+              { left: `${highThreshold}%`, transform: [{ translateX: -10 }] }
             ]}
             {...highHandlePanResponder.panHandlers}
           >
@@ -265,7 +288,7 @@ const styles = StyleSheet.create({
   sliderContainer: {
     marginBottom: 24,
     paddingHorizontal: 20, // Add padding to the entire container
-    paddingBottom: 170,
+    paddingBottom: 300, // Increased padding to ensure proper spacing
   },
   sliderLabel: {
     textAlign: 'center',
@@ -304,12 +327,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+    paddingHorizontal: 5,
   },
   sliderHandleLine: {
     width: 18,
     height: 50,
     borderRadius: 9,
     backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   lowHandle: {
     zIndex: 2,

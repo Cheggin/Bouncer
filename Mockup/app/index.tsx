@@ -1,9 +1,20 @@
 import { Text, View, ScrollView, TouchableOpacity, TextInput, Image, Linking } from "react-native"
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Component() {
   const router = useRouter()
+  const { user } = useAuth()
+
+  const handleProfilePress = () => {
+    if (user) {
+      router.push('/profile')
+    } else {
+      router.push('/login')
+    }
+  }
+
   //this should work 2
   const featuredProducts = [
     {
@@ -81,7 +92,7 @@ export default function Component() {
             <TouchableOpacity style={{ marginHorizontal: 8 }}>
               <Ionicons name="heart-outline" size={24} color="#374151" />
             </TouchableOpacity>
-            <TouchableOpacity style={{ marginHorizontal: 8 }} onPress={() => router.push('/login' as any)}>
+            <TouchableOpacity style={{ marginHorizontal: 8 }} onPress={handleProfilePress}>
               <Ionicons name="person-outline" size={24} color="#374151" />
             </TouchableOpacity>
             <TouchableOpacity style={{ marginHorizontal: 8 }}>

@@ -83,31 +83,28 @@ const SignupScreen: React.FC = () => {
         console.error('❌ Sign up error:', signUpError);
         throw signUpError;
       }
+      router.push({
+        pathname: '/check-email',
+        params: { email: email },
+      });
       
-      console.log('✅ Sign up successful, updating user profile...');
+      console.log('✅ Sign up successful, updating user profile in the background...');
       
       // Update user profile with additional data
       // The profile is automatically created by the database trigger
-      await new Promise(resolve => setTimeout(resolve, 1000));
       if (data.user) {
-        await upsertUserData(data.user.id, {
+        // No need to await this, let it run in the background
+        upsertUserData(data.user.id, {
           full_name: name,
           date_of_birth: dateOfBirth,
           city: city,
           zip_code: zipCode,
+        }).catch(err => {
+          // Even if this fails, the user has been created and notified.
+          // Log the error for debugging.
+          console.error('❌ Background profile update error:', err);
         });
       }
-      
-      Alert.alert(
-        'Account Created!',
-        'Please check your email to verify your account before signing in.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.push('/login' as any)
-          }
-        ]
-      );
       
     } catch (err) {
       console.error('❌ Authentication error:', err);
