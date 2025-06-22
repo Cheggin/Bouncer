@@ -9,10 +9,6 @@ export interface UserProfile {
   city?: string;
   zip_code?: string;
   created_at?: string;
-  avatar_url?: string | null;
-  membership_level?: string | null;
-  total_orders?: number;
-  favorite_items?: number;
 }
 
 export const upsertUserData = async (userId: string, userData: Partial<UserProfile>): Promise<void> => {

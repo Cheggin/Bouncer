@@ -96,6 +96,7 @@ const SignupScreen: React.FC = () => {
         // No need to await this, let it run in the background
         upsertUserData(data.user.id, {
           full_name: name,
+          email: email,
           date_of_birth: dateOfBirth,
           city: city,
           zip_code: zipCode,
