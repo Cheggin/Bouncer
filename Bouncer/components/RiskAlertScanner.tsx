@@ -3,7 +3,10 @@ import { View, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-nat
 import { supabase } from '@/lib/supabase';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import { ThemedButton } from './ThemedButton';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { DesignTokens } from '@/constants/Colors';
+import { CommonStyles } from '@/constants/Styles';
 
 interface Profile {
   id: string;
@@ -37,14 +40,17 @@ export default function RiskAlertScanner({ highRiskThreshold = 66 }: RiskAlertSc
   const sendEmailAlert = async (profile: Profile): Promise<boolean> => {
     try {
       console.log(`📤 Sending request for user: ${profile.full_name} (Risk: ${profile.risk_level})`);
+      console.log(`🎯 Using threshold: ${highRiskThreshold} (User risk: ${profile.risk_level})`);
       
       const response = await fetch('https://frwuwtdnzrvluqaubvnn.supabase.co/functions/v1/risk-alert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
         },
         body: JSON.stringify({
-          record: profile
+          record: profile,
+          highRiskThreshold: highRiskThreshold
         })
       });
 
@@ -152,142 +158,174 @@ export default function RiskAlertScanner({ highRiskThreshold = 66 }: RiskAlertSc
   }, []);
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
+    <View style={styles.container}>
+      <ThemedText type="h2" style={styles.title}>
         Risk Alert Scanner
       </ThemedText>
       
-      <ThemedText style={styles.description}>
-        Scan the database for users with risk level {'>'} {highRiskThreshold} and send email alerts.
-      </ThemedText>
+      <View style={styles.descriptionContainer}>
+        <ThemedText type="body" style={styles.description}>
+          Scan the database for users with risk level {'> '} 
+        </ThemedText>
+        <ThemedText type="body" style={[styles.description, styles.highRiskThreshold]}>
+          {highRiskThreshold}
+        </ThemedText>
+        <ThemedText type="body" style={styles.description}>
+          {' '}and send email alerts.
+        </ThemedText>
+      </View>
 
       {/* Scan Button */}
-      <TouchableOpacity 
-        style={[styles.button, { backgroundColor: tintColor }]}
+      <ThemedButton
+        title={scanning ? '🔍 Scanning...' : '🔍 Scan for High-Risk Users'}
+        variant="primary"
         onPress={scanning ? undefined : scanForHighRiskUsers}
-        disabled={scanning}
-      >
-        <ThemedText 
-          style={[styles.buttonText, { color: backgroundColor }]}
-        >
-          {scanning ? '🔍 Scanning...' : '🔍 Scan for High-Risk Users'}
-        </ThemedText>
-      </TouchableOpacity>
+        style={styles.scanButton}
+      />
 
       {/* Status Information */}
       {lastScanTime && (
-        <ThemedText style={styles.statusText}>
+        <ThemedText type="small" style={styles.statusText}>
           Last scan: {lastScanTime.toLocaleString()}
         </ThemedText>
       )}
 
       {highRiskCount > 0 && (
-        <ThemedText style={styles.statusText}>
+        <ThemedText type="small" style={styles.statusText}>
           High-risk users found: {highRiskCount}
         </ThemedText>
       )}
 
       {/* Results */}
       {results.length > 0 && (
-        <ScrollView style={styles.resultsContainer}>
-          <ThemedText type="subtitle" style={styles.resultsTitle}>
+        <View style={styles.resultsContainer}>
+          <ThemedText type="h3" style={styles.resultsTitle}>
             Scan Results
           </ThemedText>
           
-          {results.map((result, index) => (
-            <View key={index} style={[styles.resultItem, { borderColor: tintColor }]}>
-              <ThemedText style={styles.userName}>
-                {result.user.full_name || 'Unknown User'}
-              </ThemedText>
-              <ThemedText style={styles.userDetails}>
-                Risk Level: {result.user.risk_level}
-              </ThemedText>
-              <ThemedText style={styles.userDetails}>
-                Email: {result.user.email || 'No email'}
-              </ThemedText>
-              <ThemedText 
-                style={[
-                  styles.status, 
-                  { color: result.emailSent ? '#44aa44' : '#ff4444' }
-                ]}
-              >
-                {result.emailSent ? '✅ Email Sent' : '❌ Email Failed'}
-              </ThemedText>
-              {result.error && (
-                <ThemedText style={styles.errorText}>
-                  Error: {result.error}
+          <ScrollView style={styles.resultsList}>
+            {results.map((result, index) => (
+              <View key={index} style={styles.resultItem}>
+                <ThemedText type="body" style={styles.userName}>
+                  {result.user.full_name || 'Unknown User'}
                 </ThemedText>
-              )}
-            </View>
-          ))}
-        </ScrollView>
+                <ThemedText type="small" style={styles.userEmail}>
+                  {result.user.email}
+                </ThemedText>
+                <View style={styles.resultStatus}>
+                  <ThemedText type="small" style={[
+                    styles.statusBadge,
+                    result.emailSent ? styles.successBadge : styles.errorBadge
+                  ]}>
+                    {result.emailSent ? '✅ Sent' : '❌ Failed'}
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.riskLevel}>
+                    Risk: {result.user.risk_level}
+                  </ThemedText>
+                </View>
+                {result.error && (
+                  <ThemedText type="small" style={styles.errorText}>
+                    {result.error}
+                  </ThemedText>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 16,
-    paddingTop: 40,
+    ...CommonStyles.cardProfessional,
   },
   title: {
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 12,
+    color: DesignTokens.colors['white-000'],
+    fontSize: DesignTokens.typography.fontSize.h3,
+    fontFamily: DesignTokens.typography.fontFamily.semiBold,
+  },
+  descriptionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   description: {
     textAlign: 'center',
-    marginBottom: 24,
-    opacity: 0.8,
+    color: DesignTokens.colors['gray-400'],
+    lineHeight: 22,
   },
-  button: {
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
+  highRiskThreshold: {
+    color: '#ff4444', // Same red color as the high risk zone in the slider
+    fontWeight: '600',
   },
-  buttonText: {
-    fontWeight: 'bold',
-    fontSize: 16,
+  scanButton: {
+    marginBottom: 20,
   },
   statusText: {
     textAlign: 'center',
     marginBottom: 8,
-    opacity: 0.7,
+    color: DesignTokens.colors['gray-400'],
   },
   resultsContainer: {
-    flex: 1,
-    marginTop: 16,
+    marginTop: 20,
   },
   resultsTitle: {
-    marginBottom: 12,
-    textAlign: 'center',
+    marginBottom: 16,
+    color: DesignTokens.colors['gray-200'],
+  },
+  resultsList: {
+    maxHeight: 300,
   },
   resultItem: {
-    padding: 12,
+    backgroundColor: DesignTokens.colors['gray-800'],
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderColor: DesignTokens.colors['gray-600'],
+    marginBottom: 12,
+    padding: 16,
   },
   userName: {
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 4,
+    color: DesignTokens.colors['gray-200'],
   },
-  userDetails: {
-    fontSize: 14,
-    marginBottom: 2,
-    opacity: 0.8,
+  userEmail: {
+    marginBottom: 8,
+    color: DesignTokens.colors['gray-400'],
   },
-  status: {
-    fontWeight: 'bold',
-    marginTop: 4,
+  resultStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  successBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    color: DesignTokens.colors['success'],
+  },
+  errorBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    color: DesignTokens.colors['error'],
+  },
+  riskLevel: {
+    color: DesignTokens.colors['gray-400'],
+    fontWeight: '600',
   },
   errorText: {
-    fontSize: 12,
-    color: '#ff4444',
-    marginTop: 2,
+    color: DesignTokens.colors['error'],
+    marginTop: 4,
     fontStyle: 'italic',
   },
 }); 

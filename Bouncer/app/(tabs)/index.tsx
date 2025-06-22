@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { StyleSheet, TextInput, Pressable } from 'react-native';
+import { ThemedButton } from '@/components/ThemedButton';
+import { StripeBackground } from '@/components/StripeBackground';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { DesignTokens } from '@/constants/Colors';
 
 export default function PasswordProtectPage() {
   const [password, setPassword] = useState('');
@@ -11,7 +14,6 @@ export default function PasswordProtectPage() {
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
 
   const handleSubmit = () => {
     if (password === '1234') {
@@ -22,64 +24,99 @@ export default function PasswordProtectPage() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">Protected Area</ThemedText>
-      <ThemedText style={styles.subtitle}>
-        Please enter the password to access this site.
-      </ThemedText>
-      <TextInput
-        style={[
-          styles.input,
-          { backgroundColor, color: textColor, borderColor: tintColor },
-        ]}
-        placeholder="Password"
-        placeholderTextColor="#999"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        onSubmitEditing={handleSubmit}
-      />
-      {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
-      <Pressable style={[styles.button, { backgroundColor: tintColor }]} onPress={handleSubmit}>
-        <ThemedText style={styles.buttonText}>Continue</ThemedText>
-      </Pressable>
-    </ThemedView>
+    <StripeBackground variant="hero">
+      <ThemedView style={styles.container}>
+        <View style={styles.content}>
+          <ThemedText type="h1" style={styles.title}>
+            Protected Area
+          </ThemedText>
+          <ThemedText type="body" style={styles.subtitle}>
+            Please enter the password to access this site.
+          </ThemedText>
+          
+          <View style={styles.form}>
+            <TextInput
+              style={[
+                styles.input,
+                { 
+                  backgroundColor: DesignTokens.colors['white-000'], 
+                  color: DesignTokens.colors['black-900'],
+                  borderColor: DesignTokens.colors['gray-100'],
+                },
+              ]}
+              placeholder="Password"
+              placeholderTextColor={DesignTokens.colors['gray-400']}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              onSubmitEditing={handleSubmit}
+            />
+            
+            {error ? (
+              <ThemedText type="small" style={styles.errorText}>
+                {error}
+              </ThemedText>
+            ) : null}
+            
+            <ThemedButton
+              title="Continue"
+              variant="primary"
+              onPress={handleSubmit}
+              style={styles.button}
+            />
+          </View>
+        </View>
+      </ThemedView>
+    </StripeBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: DesignTokens.layout.containerPadding,
+    paddingVertical: DesignTokens.layout.sectionPadding.normal,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: 16,
+    color: DesignTokens.colors['white-000'],
+    maxWidth: '12ch', // Design system specification
   },
   subtitle: {
-    marginTop: 8,
-    marginBottom: 24,
+    textAlign: 'center',
+    marginBottom: 48,
+    color: DesignTokens.colors['gray-100'],
+    maxWidth: 320,
+  },
+  form: {
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
   },
   input: {
     width: '100%',
-    maxWidth: 320,
-    height: 44,
+    height: 56,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    fontSize: DesignTokens.typography.fontSize.body,
+    fontWeight: DesignTokens.typography.fontWeight.body,
   },
   button: {
     width: '100%',
-    maxWidth: 320,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  buttonText: {
-    fontWeight: 'bold',
+    marginTop: 8,
   },
   errorText: {
-    color: '#ff4444',
-    marginBottom: 12,
+    color: '#ff6b6b',
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });

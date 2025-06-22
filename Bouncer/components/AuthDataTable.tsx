@@ -3,7 +3,10 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, 
 import { supabase } from '@/lib/supabase';
 import { ThemedView } from './ThemedView';
 import { ThemedText } from './ThemedText';
+import { ThemedButton } from './ThemedButton';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { DesignTokens } from '@/constants/Colors';
+import { CommonStyles } from '@/constants/Styles';
 import { calculateRiskForAllUsers, RiskCalculationResult } from '@/services/riskCalculationService';
 
 // Define an interface for the data from the 'profiles' table
@@ -20,11 +23,13 @@ interface Profile {
 interface AuthDataTableProps {
   lowRiskThreshold?: number;
   highRiskThreshold?: number;
+  claudePrompt?: string;
 }
 
 export default function AuthDataTable({ 
   lowRiskThreshold = 33, 
-  highRiskThreshold = 66 
+  highRiskThreshold = 66,
+  claudePrompt = 'You are a risk assessment AI analyzing user data for potential security threats. Analyze the following user information and provide a risk score from 0-100.'
 }: AuthDataTableProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +56,16 @@ export default function AuthDataTable({
       return '#ffaa00'; // Solid orange for medium risk
     } else {
       return '#ff4444'; // Solid red for high risk
+    }
+  };
+
+  const getRiskLabel = (riskLevel: number) => {
+    if (riskLevel <= lowRiskThreshold) {
+      return 'Low';
+    } else if (riskLevel <= highRiskThreshold) {
+      return 'Medium';
+    } else {
+      return 'High';
     }
   };
 
@@ -108,7 +123,7 @@ export default function AuthDataTable({
         setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000)
       );
       
-      const resultsPromise = calculateRiskForAllUsers();
+      const resultsPromise = calculateRiskForAllUsers(claudePrompt);
       console.log('📞 Function called, waiting for results...');
       const results = await Promise.race([resultsPromise, timeoutPromise]) as RiskCalculationResult[];
       
@@ -142,219 +157,167 @@ export default function AuthDataTable({
   };
 
   const renderItem = ({ item }: { item: Profile }) => (
-    <View 
-      style={[
-        styles.tableRow, 
-        { 
-          borderBottomColor: borderColor,
-          backgroundColor: item.risk_level !== null ? getRiskColor(item.risk_level) : undefined
-        }
-      ]}
-    >
-      <Text style={[styles.cell, { color: textColor }]}>{item.full_name || 'N/A'}</Text>
-      <Text style={[styles.cell, { color: textColor }]}>{item.email || 'N/A'}</Text>
-      <Text style={[styles.cell, styles.riskCell, { color: textColor }]}>{item.risk_level ?? 'N/A'}</Text>
+    <View style={styles.tableRow}>
+      <Text style={[styles.cell, styles.nameCell]}>{item.full_name || 'N/A'}</Text>
+      <View style={styles.riskCell}>
+        {item.risk_level !== null ? (
+          <View style={[styles.riskBadge, { backgroundColor: getRiskColor(item.risk_level) }]}>
+            <Text style={styles.riskText}>{item.risk_level}</Text>
+          </View>
+        ) : (
+          <Text style={styles.cell}>N/A</Text>
+        )}
+      </View>
     </View>
   );
 
   const ListHeader = () => (
-    <View style={[styles.tableRow, styles.tableHeader, { borderBottomColor: borderColor }]}>
-      <Text style={[styles.headerCell, { color: textColor }]}>Name</Text>
-      <Text style={[styles.headerCell, { color: textColor }]}>Email</Text>
-      <Text style={[styles.headerCell, styles.riskCell, { color: textColor }]}>Risk Level</Text>
+    <View style={styles.tableHeader}>
+      <Text style={[styles.headerCell, styles.nameCell]}>Name</Text>
+      <Text style={[styles.headerCell, styles.riskCell]}>Risk Level</Text>
     </View>
   );
 
   const EmptyList = () => (
-    <ThemedView style={styles.emptyContainer}>
-      <ThemedText style={styles.emptyText}>No profiles found</ThemedText>
-    </ThemedView>
+    <View style={styles.emptyContainer}>
+      <ThemedText type="body" style={styles.emptyText}>No profiles found</ThemedText>
+    </View>
   );
 
   if (loading) {
     return (
-      <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <ThemedText style={styles.loadingText}>Loading Profiles Data...</ThemedText>
-      </ThemedView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={DesignTokens.colors['black-900']} />
+        <ThemedText type="body" style={styles.loadingText}>Loading Profiles Data...</ThemedText>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
+    <View style={styles.container}>
+      <ThemedText type="h2" style={styles.title}>
         User Risk Levels
       </ThemedText>
       
       {/* Risk Calculation Button */}
-      <TouchableOpacity 
-        style={[styles.calculateButton, { backgroundColor: tintColor }]}
-        onPress={handleCalculateRiskForAll}
-        disabled={calculatingRisk}
-      >
-        <ThemedText style={[styles.calculateButtonText, { color: backgroundColor }]}>
-          {calculatingRisk 
-            ? (calculationProgress || '🔄 Calculating...') 
-            : '🔍 Calculate Risk for All Users'
-          }
-        </ThemedText>
-      </TouchableOpacity>
-
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={fetchProfilesData}
-          />
+      <ThemedButton
+        title={calculatingRisk 
+          ? (calculationProgress || '🔄 Calculating...') 
+          : '🔍 Calculate Risk for All Users'
         }
-      >
-        <View style={styles.table}>
-          {/* Table Header */}
-          <View style={[styles.tableRow, styles.tableHeader, { borderBottomColor: borderColor }]}>
-            <Text style={[styles.headerCell, { flex: 0.7, color: textColor }]}>Name</Text>
-            <Text style={[styles.headerCell, styles.riskCell, { flex: 0.3, color: textColor }]}>Risk Level</Text>
-          </View>
+        variant="primary"
+        onPress={handleCalculateRiskForAll}
+        style={styles.calculateButton}
+      />
 
-          {/* Table Body */}
-          {profiles.map((profile) => (
-            <View key={profile.id}>
-              <View 
-                style={[
-                  styles.tableRow, 
-                  { borderBottomColor: borderColor }
-                ]}
-              >
-                <Text style={[styles.cell, { flex: 0.7, color: textColor }]}>{profile.full_name || 'N/A'}</Text>
-                <Text 
-                  style={[
-                    styles.cell, 
-                    styles.riskCell, 
-                    { 
-                      flex: 0.3,
-                      color: profile.risk_level !== null ? getRiskColor(profile.risk_level) : textColor,
-                      fontWeight: 'bold'
-                    }
-                  ]}
-                >
-                  {profile.risk_level ?? 'N/A'}
-                </Text>
+      {/* Table */}
+      <View style={styles.tableContainer}>
+        <ListHeader />
+        <ScrollView 
+          style={styles.tableScrollView}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={fetchProfilesData}
+              colors={[DesignTokens.colors['black-900']]}
+            />
+          }
+        >
+          {profiles.length === 0 ? (
+            <EmptyList />
+          ) : (
+            profiles.map((profile, index) => (
+              <View key={profile.id}>
+                {renderItem({ item: profile })}
               </View>
-              
-              {/* Risk Analysis Details (if available) */}
-              {profile.risk_analysis && (
-                <View style={[styles.analysisRow, { borderBottomColor: borderColor }]}>
-                  <Text style={[styles.analysisText, { color: textColor }]}>
-                    <Text style={{ fontWeight: 'bold' }}>Analysis:</Text> {profile.risk_analysis}
-                  </Text>
-                  {profile.risk_factors && profile.risk_factors.length > 0 && (
-                    <Text style={[styles.factorsText, { color: textColor }]}>
-                      <Text style={{ fontWeight: 'bold' }}>Risk Factors:</Text> {profile.risk_factors.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    </ThemedView>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  scrollView: {
-    flex: 1,
+    ...CommonStyles.cardProfessional,
   },
   title: {
-    marginBottom: 24,
-    textAlign: 'left',
-  },
-  table: {
-    flex: 1,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerCell: {
-    fontWeight: 'bold',
-    textAlign: 'left',
-  },
-  cell: {
-    // flex is now set inline
-  },
-  riskCell: {
-    // flex is now set inline
-    fontWeight: 'bold',
-    textAlign: 'right',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontStyle: 'italic',
-    fontSize: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 8,
-  },
-  tableHeader: {
-    borderBottomWidth: 2,
-    paddingBottom: 12,
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 16,
+    color: DesignTokens.colors['white-000'],
+    fontSize: DesignTokens.typography.fontSize.h3,
+    fontFamily: DesignTokens.typography.fontFamily.semiBold,
   },
   calculateButton: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
+    marginBottom: 24,
   },
-  calculateButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  tableContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: DesignTokens.colors['gray-600'],
+    backgroundColor: DesignTokens.colors['black-800'],
   },
-  analysisRow: {
-    padding: 12,
-    borderBottomWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.02)',
+  tableHeader: {
+    ...CommonStyles.tableHeader,
   },
-  analysisText: {
-    fontSize: 14,
-    marginBottom: 4,
+  tableRow: {
+    ...CommonStyles.tableRow,
   },
-  factorsText: {
-    fontSize: 14,
-    fontStyle: 'italic',
+  tableScrollView: {
+    maxHeight: 400,
   },
-  debugContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
+  headerCell: {
+    fontSize: DesignTokens.typography.fontSize.small,
+    fontWeight: '600',
+    color: DesignTokens.colors['gray-300'],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  debugTitle: {
-    fontWeight: 'bold',
-    marginBottom: 8,
+  cell: {
+    fontSize: DesignTokens.typography.fontSize.body,
+    color: DesignTokens.colors['gray-200'],
   },
-  debugScrollView: {
+  nameCell: {
     flex: 1,
   },
-  debugLog: {
-    marginBottom: 4,
+  riskCell: {
+    width: 100,
+    alignItems: 'center',
+  },
+  riskBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    minWidth: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  riskText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    ...CommonStyles.cardSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: DesignTokens.colors['gray-400'],
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: DesignTokens.colors['gray-400'],
   },
 }); 

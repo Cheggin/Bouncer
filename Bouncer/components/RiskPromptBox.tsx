@@ -1,23 +1,25 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Alert, PanResponder, Dimensions } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, PanResponder } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { DesignTokens } from '@/constants/Colors';
+import { CommonStyles } from '@/constants/Styles';
 
 interface RiskPromptBoxProps {
-  onRiskScoreGenerated?: (prompt: string, riskScore: number) => void;
   onThresholdsChange?: (low: number, high: number) => void;
+  onPromptChange?: (prompt: string) => void;
   initialLowThreshold?: number;
   initialHighThreshold?: number;
 }
 
 export default function RiskPromptBox({ 
-  onRiskScoreGenerated, 
   onThresholdsChange,
+  onPromptChange,
   initialLowThreshold = 33,
   initialHighThreshold = 66
 }: RiskPromptBoxProps) {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState('You are a risk assessment AI analyzing user data for potential security threats. Analyze the following user information and provide a risk score from 0-100.');
   const [lowThreshold, setLowThreshold] = useState(initialLowThreshold);
   const [highThreshold, setHighThreshold] = useState(initialHighThreshold);
   const [activeHandle, setActiveHandle] = useState<'low' | 'high' | null>(null);
@@ -37,6 +39,15 @@ export default function RiskPromptBox({
     setLowThreshold(initialLowThreshold);
     setHighThreshold(initialHighThreshold);
   }, [initialLowThreshold, initialHighThreshold]);
+
+  // Notify parent when prompt changes
+  const handlePromptChange = (newPrompt: string) => {
+    setPrompt(newPrompt);
+    if (onPromptChange) {
+      onPromptChange(newPrompt);
+    }
+    console.log('📝 Claude prompt updated:', newPrompt);
+  };
 
   // Notify parent when thresholds change
   const updateThresholds = (newLow: number, newHigh: number) => {
@@ -132,68 +143,40 @@ export default function RiskPromptBox({
     },
   });
 
-  // Function to generate risk score using Claude
-  const generateRiskScore = async () => {
-    if (!prompt.trim()) {
-      Alert.alert('Error', 'Please enter a prompt first');
-      return;
-    }
-
-    try {
-      // Here you would integrate with Claude API
-      // For now, we'll simulate the API call
-      console.log('🤖 Sending prompt to Claude:', prompt);
-      console.log('📊 Risk thresholds - Low:', lowThreshold, 'High:', highThreshold);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock response - in real implementation, this would come from Claude
-      const mockRiskScore = Math.floor(Math.random() * 100);
-      
-      Alert.alert(
-        'Risk Score Generated', 
-        `Prompt: "${prompt}"\nGenerated Risk Score: ${mockRiskScore}/100\nRisk Level: ${getRiskInfo(mockRiskScore).label}`
-      );
-      
-      if (onRiskScoreGenerated) {
-        onRiskScoreGenerated(prompt, mockRiskScore);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error generating risk score:', error);
-      Alert.alert('Error', 'Failed to generate risk score');
-    }
-  };
-
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
-        Risk Score Generator
+    <View style={styles.container}>
+      <ThemedText type="h2" style={styles.title}>
+        Risk Assessment Configuration
       </ThemedText>
       
-      <ThemedText style={styles.description}>
-        Enter a prompt for Claude to analyze and generate a risk score.
+      <ThemedText type="body" style={styles.description}>
+        Configure the Claude prompt and risk level thresholds for assessment.
       </ThemedText>
 
-      {/* Prompt Input */}
-      <View style={[styles.inputContainer, { borderColor: textColor + '40' }]}>
+      {/* Claude Prompt Input */}
+      <View style={styles.inputContainer}>
+        <ThemedText type="body" style={styles.inputLabel}>
+          Claude Analysis Prompt
+        </ThemedText>
         <TextInput
-          style={[styles.textInput, { color: textColor, backgroundColor }]}
-          placeholder="Enter your prompt for Claude..."
-          placeholderTextColor={textColor + '80'}
+          style={styles.textInput}
+          placeholder="Enter your prompt for Claude analysis..."
+          placeholderTextColor={DesignTokens.colors['gray-400']}
           value={prompt}
-          onChangeText={setPrompt}
+          onChangeText={handlePromptChange}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
         />
+        <ThemedText type="small" style={styles.inputHint}>
+          This prompt will be used when calculating risk scores. Leave blank to use the default prompt.
+        </ThemedText>
       </View>
 
       {/* Dual Handle Risk Level Slider */}
       <View style={styles.sliderContainer}>
-        <ThemedText style={styles.sliderLabel}>
-          Set Risk Level Thresholds
+        <ThemedText type="h3" style={styles.sliderLabel}>
+          Risk Level Thresholds
         </ThemedText>
         
         <View 
@@ -246,55 +229,65 @@ export default function RiskPromptBox({
         
         {/* Threshold Labels */}
         <View style={styles.thresholdLabels}>
-          <ThemedText style={styles.thresholdText}>
+          <ThemedText type="small" style={styles.thresholdText}>
             Low: 0-{Math.round(lowThreshold)}
           </ThemedText>
-          <ThemedText style={styles.thresholdText}>
+          <ThemedText type="small" style={styles.thresholdText}>
             Medium: {Math.round(lowThreshold) + 1}-{Math.round(highThreshold)}
           </ThemedText>
-          <ThemedText style={styles.thresholdText}>
+          <ThemedText type="small" style={styles.thresholdText}>
             High: {Math.round(highThreshold) + 1}-100
           </ThemedText>
         </View>
       </View>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 16,
+    ...CommonStyles.cardProfessional,
   },
   title: {
     marginBottom: 8,
     textAlign: 'center',
+    color: DesignTokens.colors['white-000'],
+    fontSize: DesignTokens.typography.fontSize.h3,
+    fontFamily: DesignTokens.typography.fontFamily.semiBold,
   },
   description: {
     textAlign: 'center',
     marginBottom: 24,
-    opacity: 0.8,
+    color: DesignTokens.colors['gray-400'],
+    lineHeight: 22,
   },
   inputContainer: {
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 32,
+  },
+  inputLabel: {
+    marginBottom: 8,
+    color: DesignTokens.colors['gray-200'],
+    fontSize: DesignTokens.typography.fontSize.small,
+    fontFamily: DesignTokens.typography.fontFamily.medium,
   },
   textInput: {
-    padding: 12,
-    fontSize: 16,
-    minHeight: 100,
+    ...CommonStyles.input,
+    minHeight: 120,
+    paddingTop: 16,
+  },
+  inputHint: {
+    marginTop: 8,
+    color: DesignTokens.colors['gray-500'],
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   sliderContainer: {
     marginBottom: 24,
-    paddingHorizontal: 20, // Add padding to the entire container
-    paddingBottom: 300, // Increased padding to ensure proper spacing
   },
   sliderLabel: {
     textAlign: 'center',
-    marginBottom: 12,
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginBottom: 20,
+    color: DesignTokens.colors['gray-200'],
   },
   sliderWrapper: {
     position: 'relative',
@@ -315,11 +308,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
   },
-  zoneLabel: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
   sliderHandle: {
     position: 'absolute',
     width: 20,
@@ -333,38 +321,23 @@ const styles = StyleSheet.create({
     width: 18,
     height: 50,
     borderRadius: 9,
-    backgroundColor: 'white',
-    shadowColor: '#000',
+    backgroundColor: DesignTokens.colors['white-000'],
+    shadowColor: DesignTokens.colors['accent-gray'],
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 5,
-  },
-  lowHandle: {
-    zIndex: 2,
-  },
-  highHandle: {
-    zIndex: 3,
-  },
-  sliderTouchArea: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
   },
   thresholdLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginTop: 16,
   },
   thresholdText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: DesignTokens.colors['gray-400'],
     textAlign: 'center',
     flex: 1,
   },

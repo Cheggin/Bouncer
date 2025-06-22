@@ -8,7 +8,7 @@ export interface RiskCalculationResult {
   error?: string;
 }
 
-export const calculateRiskForAllUsers = async (): Promise<RiskCalculationResult[]> => {
+export const calculateRiskForAllUsers = async (customPrompt?: string): Promise<RiskCalculationResult[]> => {
   try {
     console.log('🧪 Testing Render API with real Supabase data for all users...');
 
@@ -53,9 +53,11 @@ export const calculateRiskForAllUsers = async (): Promise<RiskCalculationResult[
       console.log(`\n🔄 Processing user ${i + 1}/${profiles.length}: ${profile.full_name} (ID: ${profile.id})`);
 
       try {
-        // Prepare data for the API call
-        const analysisPrompt = `You are a risk assessment AI analyzing user data for potential security threats. 
+        // Prepare data for the API call - use custom prompt if provided, otherwise use default
+        const analysisPrompt = customPrompt || `You are a risk assessment AI analyzing user data for potential security threats. 
 Analyze the following user information and provide a risk score from 0-100.`;
+        
+        console.log('📝 Using Claude prompt:', analysisPrompt);
         
         // Format the user text with quotes as requested
         const userText = `"${profile.full_name || ''}" OR "${profile.email || ''}"`;
