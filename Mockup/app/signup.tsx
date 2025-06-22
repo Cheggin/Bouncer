@@ -135,9 +135,6 @@ const SignupScreen: React.FC = () => {
               <ThemedText style={styles.title}>
                 Create Account
               </ThemedText>
-              <ThemedText style={styles.subtitle}>
-                Join GunsPro to get started
-              </ThemedText>
             </View>
 
             <View style={styles.form}>
