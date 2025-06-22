@@ -17,6 +17,7 @@ interface Profile {
   risk_level: number | null;
   risk_analysis?: string | null;
   risk_factors?: string[] | null;
+  reasoning_summary?: { explanation: string } | null;
   created_at: string;
 }
 
@@ -39,6 +40,7 @@ export default function AuthDataTable({
   const [calculatingRisk, setCalculatingRisk] = useState(false);
   const [calculationProgress, setCalculationProgress] = useState<string>('');
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -49,6 +51,19 @@ export default function AuthDataTable({
   const addDebugLog = (message: string) => {
     console.log(message);
     setDebugLogs(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
+
+  // Toggle row expansion for AI explanation
+  const toggleRowExpansion = (profileId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(profileId)) {
+        newSet.delete(profileId);
+      } else {
+        newSet.add(profileId);
+      }
+      return newSet;
+    });
   };
 
   const getRiskColor = (riskLevel: number) => {
@@ -166,24 +181,53 @@ export default function AuthDataTable({
     }
   };
 
-  const renderItem = ({ item }: { item: Profile }) => (
-    <View style={styles.tableRow}>
-      <Text style={[styles.cell, styles.nameCell]}>{item.full_name || 'N/A'}</Text>
-      <View style={styles.riskCell}>
-        {item.risk_level !== null ? (
-          <View style={[styles.riskBadge, { backgroundColor: getRiskColor(item.risk_level) }]}>
-            <Text style={styles.riskText}>{item.risk_level}</Text>
+  const renderItem = ({ item }: { item: Profile }) => {
+    const isExpanded = expandedRows.has(item.id);
+    const hasExplanation = item.reasoning_summary?.explanation;
+    
+    return (
+      <View style={styles.tableRowContainer}>
+        <TouchableOpacity 
+          style={styles.tableRow}
+          onPress={() => hasExplanation && toggleRowExpansion(item.id)}
+          disabled={!hasExplanation}
+        >
+          <View style={styles.nameContainer}>
+            <Text style={[styles.cell, styles.nameCell]}>{item.full_name || 'N/A'}</Text>
+            {hasExplanation && (
+              <Text style={styles.dropdownIndicator}>
+                {isExpanded ? '▼' : '▶'}
+              </Text>
+            )}
           </View>
-        ) : (
-          <Text style={styles.cell}>N/A</Text>
+          <View style={styles.riskCell}>
+            {item.risk_level !== null ? (
+              <View style={[styles.riskBadge, { backgroundColor: getRiskColor(item.risk_level) }]}>
+                <Text style={styles.riskText}>{item.risk_level}</Text>
+              </View>
+            ) : (
+              <Text style={styles.cell}>N/A</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        
+        {isExpanded && hasExplanation && (
+          <View style={styles.expandedContent}>
+            <ThemedText type="small" style={styles.explanationTitle}>
+              AI Risk Assessment:
+            </ThemedText>
+            <ThemedText type="small" style={styles.explanationText}>
+              {item.reasoning_summary?.explanation || 'No explanation available'}
+            </ThemedText>
+          </View>
         )}
       </View>
-    </View>
-  );
+    );
+  };
 
   const ListHeader = () => (
     <View style={styles.tableHeader}>
-      <Text style={[styles.headerCell, styles.nameCell]}>Name</Text>
+      <Text style={[styles.headerCell, styles.nameCell]}>Name (tap to view explanation)</Text>
       <Text style={[styles.headerCell, styles.riskCell]}>Risk Level</Text>
     </View>
   );
@@ -329,5 +373,35 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: DesignTokens.colors['gray-400'],
+  },
+  tableRowContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: DesignTokens.colors['gray-600'],
+  },
+  nameContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownIndicator: {
+    fontSize: 12,
+    color: DesignTokens.colors['gray-400'],
+    marginLeft: 8,
+  },
+  expandedContent: {
+    backgroundColor: DesignTokens.colors['gray-800'],
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: DesignTokens.colors['gray-600'],
+  },
+  explanationTitle: {
+    color: DesignTokens.colors['gray-300'],
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  explanationText: {
+    color: DesignTokens.colors['gray-200'],
+    lineHeight: 18,
   },
 }); 
