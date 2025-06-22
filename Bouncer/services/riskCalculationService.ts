@@ -12,11 +12,12 @@ export const calculateRiskForAllUsers = async (customPrompt?: string): Promise<R
   try {
     console.log('🧪 Testing Render API with real Supabase data for all users...');
 
-    // Fetch all users from your profiles table
-    console.log('🔄 Fetching all users from Supabase...');
+    // Fetch only users with risk_level = 0 (inference only called for these users)
+    console.log('🔄 Fetching users with risk_level = 0 from Supabase...');
     const { data: profiles, error: fetchError } = await supabase
       .from('profiles')
-      .select('*');
+      .select('*')
+      .eq('risk_level', 0);
 
     if (fetchError) {
       console.error('❌ Error fetching profiles:', fetchError.message);
@@ -24,11 +25,12 @@ export const calculateRiskForAllUsers = async (customPrompt?: string): Promise<R
     }
 
     if (!profiles || profiles.length === 0) {
-      console.error('❌ No profiles found in the database to test with.');
+      console.log('ℹ️ No users found with risk_level = 0. Inference only runs for users with risk_level = 0.');
       return [];
     }
     
-    console.log(`✅ Fetched ${profiles.length} users from database`);
+    console.log(`✅ Fetched ${profiles.length} users with risk_level = 0 from database`);
+    console.log('📝 Activity log: Starting inference for users with risk_level = 0 only');
 
     const results: RiskCalculationResult[] = [];
     const renderApiUrl = 'https://bouncer-backend-t8m1.onrender.com';
@@ -221,10 +223,11 @@ export const calculateRiskForAllUsersJSON = async (): Promise<RiskCalculationRes
 
     const { data: profiles, error: fetchError } = await supabase
       .from('profiles')
-      .select('*');
+      .select('*')
+      .eq('risk_level', 0);
 
     if (fetchError || !profiles || profiles.length === 0) {
-      return [{ success: false, error: 'Failed to fetch profiles or no profiles found' }];
+      return [{ success: false, error: 'Failed to fetch profiles with risk_level = 0 or no such profiles found' }];
     }
 
     const results: RiskCalculationResult[] = [];
