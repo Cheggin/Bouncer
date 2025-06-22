@@ -1,233 +1,317 @@
-import { Text, View, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native"
-import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import React, { useState } from 'react';
+import { 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  KeyboardAvoidingView, 
+  Platform, 
+  ScrollView, 
+  ActivityIndicator, 
+  Text,
+  Alert
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { ThemedText } from '../components/ThemedText';
+import { ThemedView } from '../components/ThemedView';
+import { styles } from '../styles/authstyles';
+import { supabase } from '../lib/supabase';
+import { upsertUserData } from '../services/userDataService';
 
-export default function SignupScreen() {
-  const router = useRouter()
-  const [formData, setFormData] = useState({
-    name: '',
-    dateOfBirth: '',
-    email: '',
-    address: '',
-    city: '',
-    zipCode: ''
-  })
+const SignupScreen: React.FC = () => {
+  const router = useRouter();
+  
+  // Authentication state
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  // Additional user data state
+  const [name, setName] = useState<string>('');
+  const [dateOfBirth, setDateOfBirth] = useState<string>('');
+  const [city, setCity] = useState<string>('');
+  const [zipCode, setZipCode] = useState<string>('');
 
-  const handleSignup = () => {
-    // Handle signup logic here
-    console.log('Signup data:', formData)
-  }
+  const handleSignup = async (): Promise<void> => {
+    setLoading(true);
+    setError('');
+
+    // Validation
+    if (!email || !password || !confirmPassword || !name) {
+      setError('Please fill in all required fields.');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('🔐 Attempting signup...');
+      console.log('Email:', email);
+      console.log('Name:', name);
+      
+      // Create user account with Supabase Auth (email, password, and display name)
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: { 
+            full_name: name,
+            display_name: name 
+          },
+        },
+      });
+      
+      console.log('Sign up response:', { data, error: signUpError });
+      
+      if (signUpError) {
+        console.error('❌ Sign up error:', signUpError);
+        throw signUpError;
+      }
+      
+      console.log('✅ Sign up successful, updating user profile...');
+      
+      // Update user profile with additional data
+      // The profile is automatically created by the database trigger
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (data.user) {
+        await upsertUserData(data.user.id, {
+          full_name: name,
+          date_of_birth: dateOfBirth,
+          city: city,
+          zip_code: zipCode,
+        });
+      }
+      
+      Alert.alert(
+        'Account Created!',
+        'Please check your email to verify your account before signing in.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.push('/login' as any)
+          }
+        ]
+      );
+      
+    } catch (err) {
+      console.error('❌ Authentication error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Create Account</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <LinearGradient
+          colors={['#f8f9fa', '#ffffff', '#f8f9fa']}
+          style={styles.container}
+        >
+          <ThemedView style={styles.formContainer}>
+            <View style={styles.header}>
+              <Ionicons name="shield-checkmark" size={60} color="#106b0c" />
+              <ThemedText style={styles.title}>
+                Create Account
+              </ThemedText>
+              <ThemedText style={styles.subtitle}>
+                Join GunsPro to get started
+              </ThemedText>
+            </View>
 
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>GunsPro</Text>
-        </View>
+            <View style={styles.form}>
+              {error ? <Text style={styles.errorMessage}>{error}</Text> : null}
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor="#9ca3af"
-              value={formData.name}
-              onChangeText={(value) => handleInputChange('name', value)}
-              autoCapitalize="words"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Full Name *</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="person-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Your full name"
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="calendar-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Date of Birth (MM/DD/YYYY)"
-              placeholderTextColor="#9ca3af"
-              value={formData.dateOfBirth}
-              onChangeText={(value) => handleInputChange('dateOfBirth', value)}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Date of Birth</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="calendar-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="MM/DD/YYYY"
+                    value={dateOfBirth}
+                    onChangeText={setDateOfBirth}
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#9ca3af"
-              value={formData.email}
-              onChangeText={(value) => handleInputChange('email', value)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Email *</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="mail-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="your@email.com"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="location-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Address"
-              placeholderTextColor="#9ca3af"
-              value={formData.address}
-              onChangeText={(value) => handleInputChange('address', value)}
-              autoCapitalize="words"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>City</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="business-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Your city"
+                    value={city}
+                    onChangeText={setCity}
+                    autoCapitalize="words"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="business-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="City"
-              placeholderTextColor="#9ca3af"
-              value={formData.city}
-              onChangeText={(value) => handleInputChange('city', value)}
-              autoCapitalize="words"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Zip Code</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="map-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Your zip code"
+                    value={zipCode}
+                    onChangeText={setZipCode}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="map-outline" size={20} color="#106b0c" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Zip Code"
-              placeholderTextColor="#9ca3af"
-              value={formData.zipCode}
-              onChangeText={(value) => handleInputChange('zipCode', value)}
-              keyboardType="numeric"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Password *</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="lock-closed-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Enter password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.passwordToggle}
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    <Ionicons 
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                      size={20} 
+                      color="#636E72" 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-          <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-            <Text style={styles.signupButtonText}>Create Account</Text>
-          </TouchableOpacity>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Confirm Password *</ThemedText>
+                <View style={styles.passwordContainer}>
+                  <Ionicons name="lock-closed-outline" size={20} color="#106b0c" style={{ marginLeft: 16, marginRight: 12 }} />
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.passwordToggle}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={loading}
+                  >
+                    <Ionicons 
+                      name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} 
+                      size={20} 
+                      color="#636E72" 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity style={styles.loginButton} onPress={() => router.back()}>
-            <Text style={styles.loginButtonText}>Back to Login</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
-  )
+              <TouchableOpacity style={styles.submitButton} onPress={handleSignup} disabled={loading}>
+                <LinearGradient
+                  colors={['#106b0c', '#0d5a0a']}
+                  style={styles.submitGradient}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.submitText}>
+                      Create Account
+                    </ThemedText>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+              
+              <View style={styles.toggleContainer}>
+                <ThemedText style={styles.toggleText}>
+                  Already have an account?
+                </ThemedText>
+                <TouchableOpacity onPress={() => router.push('/login' as any)} disabled={loading}>
+                  <ThemedText style={styles.toggleLink}>
+                    Sign In
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+              disabled={loading}
+            >
+              <Ionicons name="arrow-back" size={24} color="#636E72" />
+              <ThemedText style={styles.backText}>Back</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        </LinearGradient>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    padding: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 8,
-  },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-  },
-  signupButton: {
-    backgroundColor: '#106b0c',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  signupButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  loginButton: {
-    borderWidth: 1,
-    borderColor: '#106b0c',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  loginButtonText: {
-    color: '#106b0c',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-}) 
+export default SignupScreen; 
